@@ -114,10 +114,19 @@ class Blogger_Image_Detector {
 
 		// Internal link format /YYYY/MM/slug.html
 		if ( preg_match_all(
-			'/href=["\'][^"\']*\/\d{4}\/\d{2}\/[^"\']+\.html["\']/i',
+			'/href=["\']([^"\']*\/\d{4}\/\d{2}\/[^"\']+\.html)["\']/i',
 			$content, $matches
 		) ) {
-			$issues['blogger_html_links'][] = array( 'post_id' => $id, 'count' => count( $matches[0] ) );
+			$count = 0;
+			foreach ( $matches[1] as $url ) {
+				$host = wp_parse_url( $url, PHP_URL_HOST );
+				if ( ! $host || $host === wp_parse_url( home_url(), PHP_URL_HOST ) ) {
+					++$count;
+				}
+			}
+			if ( $count > 0 ) {
+				$issues['blogger_html_links'][] = array( 'post_id' => $id, 'count' => $count );
+			}
 		}
 
 		// Pola HTML lama

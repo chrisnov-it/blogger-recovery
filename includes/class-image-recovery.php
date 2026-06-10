@@ -46,7 +46,12 @@ class Blogger_Image_Recovery {
 		}
 
 		$offset = isset( $_POST['offset'] ) ? intval( $_POST['offset'] ) : 0;
+		$dry_run = ! isset( $_POST['dry_run'] ) || rest_sanitize_boolean( wp_unslash( $_POST['dry_run'] ) );
 		$logs   = '';
+
+		if ( ! $dry_run && ( ! isset( $_POST['apply_confirm'] ) || 'APPLY' !== wp_unslash( $_POST['apply_confirm'] ) ) ) {
+			wp_send_json_error( 'Apply ditolak: konfirmasi eksplisit tidak valid.' );
+		}
 
 		$posts = get_posts( array(
 			'numberposts' => $this->batch_size,
@@ -64,8 +69,9 @@ class Blogger_Image_Recovery {
 			// --- Kondisi A: strip Blogger href wrapper ---
 			$new_content = preg_replace_callback(
 				'/<a\s[^>]*href=["\']https?:\/\/\d+\.bp\.blogspot\.com\/[^"\']+["\'][^>]*>\s*(<img\s[^>]*src=["\'][^"\']+["\'][^>]*\/?>)\s*<\/a>/i',
-				function( $matches ) use ( &$logs, $post ) {
-					$logs .= "Post #{$post->ID}: [A] Stripped Blogger href wrapper, kept local src.\n";
+				function( $matches ) use ( &$logs, $post, $dry_run ) {
+					$prefix = $dry_run ? '[DRY-RUN] Would strip' : 'Stripped';
+					$logs  .= "Post #{$post->ID}: [A] {$prefix} Blogger href wrapper, kept local src.\n";
 					return $matches[1];
 				},
 				$content
@@ -85,6 +91,12 @@ class Blogger_Image_Recovery {
 					$full_tag    = $match[0];
 					$blogger_url = $match[2];
 
+					if ( $dry_run ) {
+						$logs   .= "Post #{$post->ID}: [B] [DRY-RUN] Would download and import {$blogger_url}.\n";
+						$updated = true;
+						continue;
+					}
+
 					$result = $this->download_and_import( $blogger_url, $post->ID );
 
 					if ( $result['success'] ) {
@@ -98,12 +110,14 @@ class Blogger_Image_Recovery {
 				}
 			}
 
-			if ( $updated ) {
+			if ( $updated && ! $dry_run ) {
 				wp_update_post( array(
 					'ID'           => $post->ID,
 					'post_content' => $content,
 				) );
 				$logs .= "Post #{$post->ID}: ✓ Content updated.\n";
+			} elseif ( $updated ) {
+				$logs .= "Post #{$post->ID}: [DRY-RUN] No files, attachments, or post content were changed.\n";
 			}
 		}
 
@@ -115,6 +129,7 @@ class Blogger_Image_Recovery {
 			'total_posts'     => $total,
 			'batch_size'      => $this->batch_size,
 			'has_more'        => ( $offset + $this->batch_size ) < $total,
+			'dry_run'         => $dry_run,
 		) );
 	}
 

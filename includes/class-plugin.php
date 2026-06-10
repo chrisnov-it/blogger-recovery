@@ -96,10 +96,16 @@ class Blogger_Recovery_Plugin {
 			</div>
 
 			<div class="br-notice br-notice--success" style="margin-top:20px;">
-				<strong>✅ v2.0 Fixes:</strong>
+				<strong>v2.1:</strong>
 				Urutan cleanup diperbaiki (malformed quotes → AdSense),
 				logic Image Recovery disesuaikan kondisi real (strip href wrapper),
-				modul Redirect Migrator baru, dan plugin direfactor ke struktur multi-file.
+				internal links memakai fallback Redirection, dan operasi tulis dilindungi dry-run.
+			</div>
+			<div class="br-notice br-notice--warn" style="margin-top:20px;">
+				<strong>PERINGATAN OPERASI DESTRUKTIF:</strong>
+				Image Recovery, HTML Cleanup, dan Redirect Migrator dapat mengubah konten, membuat attachment,
+				atau menulis konfigurasi redirect dalam jumlah besar. Jalankan <strong>Dry-run</strong> terlebih dahulu,
+				periksa log, dan pastikan backup database serta folder uploads tersedia sebelum memakai mode Apply.
 			</div>
 		</div>
 		<?php
@@ -154,7 +160,7 @@ class Blogger_Recovery_Plugin {
 					['🔗 Blogger href wrapper <em>(src sudah lokal)</em>', issues.blogger_href_wrapper.length, 'Image Recovery → strip href wrapper'],
 					['🖼 Gambar src masih ke Blogger',                    issues.full_blogger_images.length,  'Image Recovery → download & import'],
 					['🚫 AdSense block tertanam',                         issues.adsense_blocks.length,       'HTML Cleanup → Remove AdSense'],
-					['🔗 Internal link format .html',                     issues.blogger_html_links.length,   'HTML Cleanup → Fix HTML Links'],
+					['🔗 Internal link format .html',                     issues.blogger_html_links.length,   'HTML Cleanup → resolve via slug + Redirection'],
 					['🔧 HTML lama (tr_bq, border, dll)',                  issues.old_html.length,             'HTML Cleanup → Misc'],
 				];
 				var h = '<h2>📊 Scan Results</h2><table class="widefat striped"><thead><tr><th>Issue</th><th>Count</th><th>Action</th></tr></thead><tbody>';
@@ -196,8 +202,15 @@ class Blogger_Recovery_Plugin {
 				<strong>Mode A</strong> — <code>src</code> sudah lokal tapi <code>href</code> wrapper ke Blogger → hapus wrapper <code>&lt;a&gt;</code>.<br>
 				<strong>Mode B</strong> — <code>src</code> masih ke Blogger → download dari Google, import ke Media Library, update src.
 			</div>
+			<div class="br-notice br-notice--warn">
+				<strong>PERINGATAN:</strong> Mode Apply akan mengubah HTML artikel dan dapat membuat file serta attachment baru.
+				Dry-run hanya membuat laporan dan tidak mengunduh gambar atau menulis database.
+			</div>
 
-			<button class="button button-primary" id="btn-recover">▶ Start Recovery</button>
+			<label><input type="checkbox" id="recover-dry-run" checked> <strong>Dry-run (direkomendasikan)</strong></label>
+			<p>
+				<button class="button button-primary" id="btn-recover">▶ Run Image Recovery</button>
+			</p>
 			<div id="recover-progress" class="br-progress"></div>
 			<div id="recover-log" class="br-log"></div>
 		</div>
@@ -206,19 +219,26 @@ class Blogger_Recovery_Plugin {
 		jQuery(function($){
 			var nonce = '<?php echo esc_js( $nonce ); ?>';
 			$('#btn-recover').on('click', function(){
+				var dryRun = $('#recover-dry-run').is(':checked');
+				var confirmation = dryRun ? '' : prompt('Mode Apply akan mengubah konten dan Media Library. Ketik APPLY untuk melanjutkan:');
+				if (!dryRun && confirmation !== 'APPLY') return;
 				$(this).prop('disabled', true);
 				$('#recover-log').html('');
-				$('#recover-progress').html('Starting…');
-				runBatch(0);
+				$('#recover-progress').html(dryRun ? 'Starting dry-run…' : 'Starting APPLY mode…');
+				runBatch(0, dryRun, confirmation);
 			});
-			function runBatch(offset){
-				$.post(ajaxurl, { action:'blogger_recover_images', offset:offset, _wpnonce:nonce }, function(r){
-					if (!r.success){ $('#recover-log').append('<span class="br-error">Error: '+r.data+'</span>'); return; }
+			function runBatch(offset, dryRun, confirmation){
+				$.post(ajaxurl, { action:'blogger_recover_images', offset:offset, dry_run:dryRun, apply_confirm:confirmation, _wpnonce:nonce }, function(r){
+					if (!r.success){ $('#recover-log').append('<span class="br-error">Error: '+r.data+'</span>'); $('#btn-recover').prop('disabled', false); return; }
 					var d = r.data;
 					if (d.logs) $('#recover-log').append(d.logs+'<br>');
 					$('#recover-progress').html('Processed: <strong>'+d.total_processed+' / '+d.total_posts+'</strong>');
-					if (d.has_more){ setTimeout(function(){ runBatch(offset + d.batch_size); }, 800); }
-					else { $('#recover-log').append('<br><strong class="br-success">✓ Recovery selesai!</strong>'); $('#btn-recover').prop('disabled', false); }
+					if (d.has_more){ setTimeout(function(){ runBatch(offset + d.batch_size, dryRun, confirmation); }, 800); }
+					else {
+						var message = dryRun ? '✓ Dry-run selesai. Tidak ada perubahan yang ditulis.' : '✓ Recovery selesai dan perubahan telah diterapkan.';
+						$('#recover-log').append('<br><strong class="br-success">'+message+'</strong>');
+						$('#btn-recover').prop('disabled', false);
+					}
 				}, 'json');
 			}
 		});
@@ -237,9 +257,16 @@ class Blogger_Recovery_Plugin {
 			<h1>🧹 HTML Cleanup</h1>
 
 			<div class="br-notice br-notice--warn">
+				<strong>PERINGATAN OPERASI DESTRUKTIF:</strong>
+				Mode Apply menulis ulang <code>post_content</code> ratusan artikel. Backup database wajib tersedia.
 				<strong>Urutan kritis v2.0:</strong>
 				Malformed quotes (<code>width=""180?"</code>) diperbaiki <em>sebelum</em> AdSense removal —
 				ini yang menyebabkan AdSense tidak terhapus di versi sebelumnya.
+			</div>
+			<div class="br-notice br-notice--info">
+				<strong>Internal links:</strong> Semua anchor termasuk blok manual seperti <code>BACA JUGA</code> diperiksa berdasarkan
+				<code>href</code>. Plugin mencoba slug WordPress aktif terlebih dahulu, lalu rule aktif plugin Redirection.
+				Link yang tidak dapat dipastikan targetnya akan dibiarkan dan dicatat sebagai unresolved.
 			</div>
 
 			<div class="br-card" style="margin-bottom:20px;">
@@ -259,7 +286,8 @@ class Blogger_Recovery_Plugin {
 				<label><input type="checkbox" id="opt-empty" checked> Clean empty elements & extra breaks</label>
 			</div>
 
-			<button class="button button-primary" id="btn-cleanup">▶ Start Cleanup</button>
+			<label><input type="checkbox" id="cleanup-dry-run" checked> <strong>Dry-run (direkomendasikan)</strong></label>
+			<p><button class="button button-primary" id="btn-cleanup">▶ Run HTML Cleanup</button></p>
 			<div id="cleanup-progress" class="br-progress"></div>
 			<div id="cleanup-log" class="br-log"></div>
 		</div>
@@ -269,13 +297,17 @@ class Blogger_Recovery_Plugin {
 			var nonce = '<?php echo esc_js( $nonce ); ?>';
 			var totals = {};
 			$('#btn-cleanup').on('click', function(){
+				var dryRun = $('#cleanup-dry-run').is(':checked');
+				var confirmation = dryRun ? '' : prompt('Mode Apply akan menulis ulang konten artikel. Ketik APPLY untuk melanjutkan:');
+				if (!dryRun && confirmation !== 'APPLY') return;
 				$(this).prop('disabled', true);
 				totals = {
 					adsense_removed: 0,
 					html_links_fixed: 0,
 					captions_converted: 0,
 					tables_cleaned: 0,
-					quotes_fixed: 0
+					quotes_fixed: 0,
+					links_unresolved: 0
 				};
 				var opts = {
 					cleanup_malformed_quotes: $('#opt-quotes').is(':checked'),
@@ -290,23 +322,24 @@ class Blogger_Recovery_Plugin {
 					cleanup_empty_elements:   $('#opt-empty').is(':checked'),
 				};
 				$('#cleanup-log').html('');
-				$('#cleanup-progress').html('Starting…');
-				runBatch(0, opts);
+				$('#cleanup-progress').html(dryRun ? 'Starting dry-run…' : 'Starting APPLY mode…');
+				runBatch(0, opts, dryRun, confirmation);
 			});
-			function runBatch(offset, opts){
-				$.post(ajaxurl, { action:'cleanup_blogger_html', offset:offset, options:opts, _wpnonce:nonce }, function(r){
-					if (!r.success){ $('#cleanup-log').append('<span class="br-error">Error: '+r.data+'</span>'); return; }
+			function runBatch(offset, opts, dryRun, confirmation){
+				$.post(ajaxurl, { action:'cleanup_blogger_html', offset:offset, options:opts, dry_run:dryRun, apply_confirm:confirmation, _wpnonce:nonce }, function(r){
+					if (!r.success){ $('#cleanup-log').append('<span class="br-error">Error: '+r.data+'</span>'); $('#btn-cleanup').prop('disabled', false); return; }
 					var d = r.data;
 					if (d.logs) $('#cleanup-log').append(d.logs);
 					$.each(d.stats, function(key, value){ totals[key] += value; });
 					$('#cleanup-progress').html('Processed: <strong>'+d.total_processed+' / '+d.total_posts+'</strong>');
-					if (d.has_more){ setTimeout(function(){ runBatch(offset + d.batch_size, opts); }, 800); }
+					if (d.has_more){ setTimeout(function(){ runBatch(offset + d.batch_size, opts, dryRun, confirmation); }, 800); }
 					else {
 						var s = totals;
 						var summary = '<br><div class="br-notice br-notice--success">'
-							+ '<strong>✅ Selesai! Summary:</strong><br>'
+							+ '<strong>'+(dryRun ? 'Dry-run selesai, tidak ada perubahan ditulis.' : 'Apply selesai, perubahan telah ditulis.')+'</strong><br>'
 							+ '• AdSense dihapus: '+s.adsense_removed+' artikel<br>'
 							+ '• HTML links fixed: '+s.html_links_fixed+' artikel<br>'
+							+ '• HTML links unresolved: '+s.links_unresolved+' link<br>'
 							+ '• Caption tables: '+s.captions_converted+'<br>'
 							+ '• Tables cleaned: '+s.tables_cleaned+'<br>'
 							+ '• Quotes fixed: '+s.quotes_fixed+'<br>'
@@ -332,6 +365,10 @@ class Blogger_Recovery_Plugin {
 		<div class="wrap br-wrap">
 			<h1>🔀 Redirect Migrator</h1>
 			<p>Export rules dari plugin <strong>Redirection</strong> dan import ke <strong>Yoast SEO Premium</strong>.</p>
+			<div class="br-notice br-notice--warn">
+				<strong>PERINGATAN:</strong> Mode Apply menulis konfigurasi redirect Yoast Premium.
+				Jalankan dry-run dan export CSV terlebih dahulu. Jangan menonaktifkan Redirection sebelum hasil redirect diuji.
+			</div>
 
 			<?php if ( ! $yoast_active ) : ?>
 			<div class="br-notice br-notice--warn">
@@ -343,9 +380,10 @@ class Blogger_Recovery_Plugin {
 				<button class="button button-primary" id="btn-load">📂 Load Rules dari Redirection</button>
 				<button class="button" id="btn-csv" disabled>⬇ Export CSV</button>
 				<button class="button button-primary" id="btn-yoast" disabled <?php echo $yoast_active ? '' : 'title="Yoast Premium tidak aktif"'; ?>>
-					🚀 Import ke Yoast Premium
+					▶ Run Yoast Migration
 				</button>
 			</div>
+			<label><input type="checkbox" id="redirect-dry-run" checked> <strong>Dry-run (direkomendasikan)</strong></label>
 
 			<div id="redirect-status" class="br-progress"></div>
 			<div id="redirect-table"></div>
@@ -402,15 +440,17 @@ class Blogger_Recovery_Plugin {
 			});
 
 			$('#btn-yoast').on('click', function(){
-				if (!confirm('Import '+allRules.length+' rules ke Yoast Premium?\nRules yang sudah ada akan dilewati (tidak di-overwrite).')) return;
+				var dryRun = $('#redirect-dry-run').is(':checked');
+				var confirmation = dryRun ? '' : prompt('Mode Apply akan menulis '+allRules.length+' redirect ke Yoast. Ketik APPLY untuk melanjutkan:');
+				if (!dryRun && confirmation !== 'APPLY') return;
 				$(this).prop('disabled', true).text('Importing…');
-				$.post(ajaxurl, { action:'import_to_yoast', rules:JSON.stringify(allRules), _wpnonce:nonce }, function(r){
-					$('#btn-yoast').prop('disabled', false).text('🚀 Import ke Yoast Premium');
+				$.post(ajaxurl, { action:'import_to_yoast', rules:JSON.stringify(allRules), dry_run:dryRun, apply_confirm:confirmation, _wpnonce:nonce }, function(r){
+					$('#btn-yoast').prop('disabled', false).text('▶ Run Yoast Migration');
 					if (!r.success){ alert('Error: '+r.data); return; }
 					var d = r.data;
 					$('#redirect-status').html('<span class="br-success"><strong>✅ '+d.message+'</strong></span>');
-					if (d.imported > 0){
-						$('#redirect-status').append('<br><small>Setelah import selesai, kamu bisa nonaktifkan plugin Redirection.</small>');
+					if (!d.dry_run && d.imported > 0){
+						$('#redirect-status').append('<br><small>Uji redirect hasil import sebelum mempertimbangkan menonaktifkan plugin Redirection.</small>');
 					}
 				}, 'json');
 			});

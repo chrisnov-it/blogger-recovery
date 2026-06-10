@@ -92,12 +92,20 @@ class Blogger_Redirect_Migrator {
 			wp_send_json_error( 'Unauthorized' );
 		}
 
-		if ( ! class_exists( 'WPSEO_Redirect_Importer' ) || ! class_exists( 'WPSEO_Redirect' ) ) {
+		if ( ! class_exists( 'WPSEO_Redirect_Importer' )
+			|| ! class_exists( 'WPSEO_Redirect_Manager' )
+			|| ! class_exists( 'WPSEO_Redirect' )
+		) {
 			wp_send_json_error( 'Yoast SEO Premium tidak aktif atau redirect manager tidak tersedia.' );
 		}
 
 		$rules_json = isset( $_POST['rules'] ) ? wp_unslash( $_POST['rules'] ) : '';
 		$rules      = json_decode( $rules_json, true );
+		$dry_run    = ! isset( $_POST['dry_run'] ) || rest_sanitize_boolean( wp_unslash( $_POST['dry_run'] ) );
+
+		if ( ! $dry_run && ( ! isset( $_POST['apply_confirm'] ) || 'APPLY' !== wp_unslash( $_POST['apply_confirm'] ) ) ) {
+			wp_send_json_error( 'Apply ditolak: konfirmasi eksplisit tidak valid.' );
+		}
 
 		if ( empty( $rules ) ) {
 			wp_send_json_error( 'Tidak ada rules yang dikirim.' );
@@ -123,15 +131,35 @@ class Blogger_Redirect_Migrator {
 			wp_send_json_error( 'Tidak ada redirect valid yang dapat diimport.' );
 		}
 
-		$importer = new WPSEO_Redirect_Importer();
-		$result   = $importer->import( $redirects );
-		$imported = intval( $result['total_imported'] );
-		$skipped  = intval( $result['total_redirects'] ) - $imported;
+		$manager = new WPSEO_Redirect_Manager();
+		$pending = array();
+
+		foreach ( $redirects as $redirect ) {
+			if ( $manager->get_redirect( $redirect->get_origin() ) ) {
+				continue;
+			}
+			$pending[] = $redirect;
+		}
+
+		$imported = count( $pending );
+		$skipped  = count( $redirects ) - $imported;
+
+		if ( ! $dry_run && $imported > 0 ) {
+			$importer = new WPSEO_Redirect_Importer();
+			$result   = $importer->import( $pending );
+			$imported = intval( $result['total_imported'] );
+			$skipped  = count( $redirects ) - $imported;
+		}
+
+		$message = $dry_run
+			? "Dry-run selesai: {$imported} rules dapat ditambahkan ke Yoast, {$skipped} dilewati (sudah ada)."
+			: "Import selesai: {$imported} rules ditambahkan ke Yoast, {$skipped} dilewati (sudah ada).";
 
 		wp_send_json_success( array(
 			'imported' => $imported,
 			'skipped'  => $skipped,
-			'message'  => "Import selesai: {$imported} rules ditambahkan ke Yoast, {$skipped} dilewati (sudah ada).",
+			'dry_run'  => $dry_run,
+			'message'  => $message,
 		) );
 	}
 }

@@ -2,6 +2,8 @@
 
 A WordPress recovery plugin built specifically around the Blogger migration issues found on ranalino.co.
 
+Current plugin version: **2.1.0**
+
 ## 🚀 Features
 
 - **Issues Detector**: Scans published posts for Blogger image wrappers, remote Blogger image sources, embedded AdSense, legacy `.html` links, and old Blogger markup.
@@ -14,6 +16,8 @@ A WordPress recovery plugin built specifically around the Blogger migration issu
   - Modernizes table structures.
   - Converts Blogger caption tables into standard WordPress `<figure>` and `<figcaption>` elements.
 - **Redirect Migrator**: Exports active Redirection rules to CSV and imports them through the Yoast SEO Premium redirect API.
+- **Dry-run by Default**: Image recovery, HTML cleanup, and redirect migration preview their work without writing files or database changes.
+- **Explicit Apply Guard**: Write operations require disabling dry-run and typing `APPLY`.
 
 ## 🛠️ Installation
 
@@ -25,9 +29,10 @@ A WordPress recovery plugin built specifically around the Blogger migration issu
 
 1. **Backup your database** before running any automated cleanup.
 2. Run the **Issues Detector** to see the extent of migration issues.
-3. Run **Image Recovery** to bring all images over to your server.
-4. Run **HTML Cleanup** to ensure your posts look modern and clean.
-5. Review unresolved `.html` links, then migrate valid Redirection rules to Yoast Premium.
+3. Run each recovery module in **Dry-run** mode and review its log.
+4. Run **Image Recovery** in Apply mode only after verifying the image report.
+5. Run **HTML Cleanup** in Apply mode; manually authored links such as `BACA JUGA` are resolved from their `href` using current post slugs and active Redirection rules.
+6. Review unresolved `.html` links, export redirect CSV, then migrate valid Redirection rules to Yoast Premium.
 
 ## 📝 Technical Details
 

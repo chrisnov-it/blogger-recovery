@@ -34,7 +34,11 @@ class Blogger_HTML_Cleanup {
 		'captions_converted' => 0,
 		'tables_cleaned'     => 0,
 		'quotes_fixed'       => 0,
+		'links_unresolved'   => 0,
 	);
+
+	/** @var array|null Active non-regex Redirection rules, keyed by source path. */
+	private $redirect_map = null;
 
 	public function __construct() {
 		add_action( 'wp_ajax_cleanup_blogger_html', array( $this, 'ajax_cleanup' ) );
@@ -52,7 +56,12 @@ class Blogger_HTML_Cleanup {
 
 		$offset  = isset( $_POST['offset'] ) ? intval( $_POST['offset'] ) : 0;
 		$options = isset( $_POST['options'] ) ? (array) $_POST['options'] : array();
+		$dry_run = ! isset( $_POST['dry_run'] ) || rest_sanitize_boolean( wp_unslash( $_POST['dry_run'] ) );
 		$logs    = '';
+
+		if ( ! $dry_run && ( ! isset( $_POST['apply_confirm'] ) || 'APPLY' !== wp_unslash( $_POST['apply_confirm'] ) ) ) {
+			wp_send_json_error( 'Apply ditolak: konfirmasi eksplisit tidak valid.' );
+		}
 
 		$posts = get_posts( array(
 			'numberposts' => $this->batch_size,
@@ -74,11 +83,13 @@ class Blogger_HTML_Cleanup {
 			$content = $this->step_convert_captions( $content, $options, $post, $logs );
 			$content = $this->step_misc_cleanup( $content, $options, $post, $logs );
 
-			if ( $content !== $before ) {
+			if ( $content !== $before && ! $dry_run ) {
 				wp_update_post( array(
 					'ID'           => $post->ID,
 					'post_content' => $content,
 				) );
+			} elseif ( $content !== $before ) {
+				$logs .= "Post #{$post->ID}: [DRY-RUN] Changes previewed only; database was not updated.\n";
 			}
 		}
 
@@ -91,6 +102,7 @@ class Blogger_HTML_Cleanup {
 			'batch_size'      => $this->batch_size,
 			'has_more'        => ( $offset + $this->batch_size ) < $total,
 			'stats'           => $this->stats,
+			'dry_run'         => $dry_run,
 		) );
 	}
 
@@ -182,30 +194,27 @@ class Blogger_HTML_Cleanup {
 			return $content;
 		}
 
-		$before  = $content;
-		$fixed   = 0;
+		$before = $content;
 		$content = preg_replace_callback(
 			'/href=["\']([^"\']*\/\d{4}\/\d{2}\/([^"\']+)\.html)["\']/',
-			function( $matches ) use ( &$logs, &$fixed, $post ) {
+			function( $matches ) use ( &$logs, $post ) {
 				$old_url = $matches[1];
 				$slug    = sanitize_title( basename( $matches[2] ) );
 
-				$found = get_posts( array(
-					'name'        => $slug,
-					'post_type'   => 'post',
-					'post_status' => 'publish',
-					'numberposts' => 1,
-				) );
+				if ( ! $this->is_internal_url( $old_url ) ) {
+					return $matches[0];
+				}
 
-				if ( ! empty( $found ) ) {
-					$new_url = get_permalink( $found[0]->ID );
+				$new_url = $this->resolve_internal_link( $old_url, $slug );
+
+				if ( $new_url ) {
 					$logs   .= "Post #{$post->ID}: Link fixed: {$old_url} → {$new_url}\n";
-					$fixed++;
 					return 'href="' . esc_url( $new_url ) . '"';
 				}
 
-				// Tidak ketemu di DB — biarkan
-				return 'href="' . esc_url( $old_url ) . '"';
+				$logs .= "Post #{$post->ID}: Link unresolved, left unchanged: {$old_url}\n";
+				++$this->stats['links_unresolved'];
+				return $matches[0];
 			},
 			$content
 		);
@@ -214,6 +223,93 @@ class Blogger_HTML_Cleanup {
 			++$this->stats['html_links_fixed'];
 		}
 		return $content;
+	}
+
+	/**
+	 * Resolve Blogger legacy links through the current post slug first, then
+	 * through active rules from the Redirection plugin.
+	 *
+	 * This also covers manually authored blocks such as "BACA JUGA" because
+	 * resolution is based on the anchor href, not surrounding label text.
+	 *
+	 * @param string $old_url Original href value.
+	 * @param string $slug    Slug parsed from the Blogger URL.
+	 * @return string|false
+	 */
+	private function resolve_internal_link( $old_url, $slug ) {
+		$found = get_posts( array(
+			'name'        => $slug,
+			'post_type'   => 'post',
+			'post_status' => 'publish',
+			'numberposts' => 1,
+		) );
+
+		if ( ! empty( $found ) ) {
+			return get_permalink( $found[0]->ID );
+		}
+
+		$path = wp_parse_url( $old_url, PHP_URL_PATH );
+		if ( ! $path ) {
+			return false;
+		}
+
+		$redirect_map = $this->get_redirect_map();
+		if ( empty( $redirect_map[ $path ] ) ) {
+			return false;
+		}
+
+		$target = $redirect_map[ $path ];
+		if ( wp_parse_url( $target, PHP_URL_HOST ) ) {
+			return $target;
+		}
+
+		return home_url( '/' . ltrim( $target, '/' ) );
+	}
+
+	/**
+	 * Determine whether a legacy URL belongs to this WordPress site.
+	 *
+	 * @param string $url URL from post content.
+	 * @return bool
+	 */
+	private function is_internal_url( $url ) {
+		$host = wp_parse_url( $url, PHP_URL_HOST );
+
+		return ! $host || $host === wp_parse_url( home_url(), PHP_URL_HOST );
+	}
+
+	/**
+	 * Load active plain redirects once per AJAX request.
+	 *
+	 * @return array
+	 */
+	private function get_redirect_map() {
+		if ( null !== $this->redirect_map ) {
+			return $this->redirect_map;
+		}
+
+		global $wpdb;
+
+		$this->redirect_map = array();
+		$table              = $wpdb->prefix . 'redirection_items';
+
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) !== $table ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			return $this->redirect_map;
+		}
+
+		$rules = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			"SELECT url, action_data
+			 FROM {$table}
+			 WHERE status = 'enabled'
+			   AND regex = 0
+			 ORDER BY id ASC"
+		);
+
+		foreach ( $rules as $rule ) {
+			$this->redirect_map[ $rule->url ] = $rule->action_data;
+		}
+
+		return $this->redirect_map;
 	}
 
 	// =========================================================================
