@@ -1,0 +1,89 @@
+/* Blogger Recovery Tools — Admin Styles */
+
+.br-wrap h1 { margin-bottom: 5px; }
+.br-version  { font-size: 12px; color: #888; font-weight: normal; vertical-align: middle; }
+
+/* Grid layout */
+.br-grid-2 {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 20px;
+	margin-top: 20px;
+}
+@media ( max-width: 782px ) {
+	.br-grid-2 { grid-template-columns: 1fr; }
+}
+
+/* Card */
+.br-card {
+	background: #fff;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	padding: 20px;
+}
+.br-card h2 { margin-top: 0; font-size: 15px; }
+.br-card label {
+	display: block;
+	margin-bottom: 8px;
+	cursor: pointer;
+}
+.br-card--warn {
+	background: #fff8e1;
+	border-color: #ffe082;
+}
+
+/* Section labels inside card */
+.br-section-label {
+	font-weight: bold;
+	margin: 0 0 8px;
+}
+.br-label--high  { color: #c62828; }
+.br-label--info  { color: #1565c0; }
+.br-divider      { margin: 15px 0; border-color: #eee; }
+
+/* Notices */
+.br-notice {
+	padding: 12px 15px;
+	border-left: 4px solid #ccc;
+	border-radius: 2px;
+	margin-bottom: 20px;
+}
+.br-notice--info    { background: #e3f2fd; border-color: #2196f3; }
+.br-notice--warn    { background: #fff3e0; border-color: #ff9800; }
+.br-notice--success { background: #e8f5e9; border-color: #4caf50; }
+
+/* Actions row */
+.br-actions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-bottom: 15px;
+}
+
+/* Progress */
+.br-progress {
+	margin: 10px 0;
+	font-weight: bold;
+	min-height: 22px;
+}
+
+/* Log output */
+.br-log {
+	margin-top: 10px;
+	padding: 10px 14px;
+	background: #f5f5f5;
+	border: 1px solid #ddd;
+	border-radius: 3px;
+	max-height: 500px;
+	overflow-y: auto;
+	font-family: 'Courier New', monospace;
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+/* Results */
+.br-results { margin-top: 15px; }
+
+/* Status messages */
+.br-error   { color: #c62828; }
+.br-success { color: #2e7d32; }
