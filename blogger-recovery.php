@@ -5,7 +5,7 @@
  * Description:       Tools lengkap untuk recovery migrasi dari Blogger ke WordPress.
  *                    Menangani gambar Blogger (dua kondisi URL), AdSense tertanam,
  *                    internal link format .html, dan migrasi redirect rules ke Yoast.
- * Version:           2.3.0
+ * Version:           2.3.1
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Author:            Reynov Christian
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BLOGGER_RECOVERY_VERSION', '2.3.0' );
+define( 'BLOGGER_RECOVERY_VERSION', '2.3.1' );
 define( 'BLOGGER_RECOVERY_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BLOGGER_RECOVERY_URL', plugin_dir_url( __FILE__ ) );
 
