@@ -2,7 +2,7 @@
 
 A WordPress recovery toolkit for auditing and cleaning up common issues after migrating content from Blogger to WordPress.
 
-Current plugin version: **2.3.0**
+Current plugin version: **2.4.0**
 
 ## 🚀 Features
 
@@ -12,6 +12,8 @@ Current plugin version: **2.3.0**
   - Removes AdSense blocks (Tables, Scripts, and Ads).
   - Fixes malformed HTML quotes (e.g., `align=""left""`).
   - Resolves Blogger `.html` links to matching WordPress post slugs.
+  - Removes an early body heading only when it exactly matches the WordPress post title.
+  - Adds consistent vertical spacing to manually authored `BACA JUGA` link blocks.
   - Converts deprecated `align` attributes to modern CSS classes.
   - Modernizes table structures.
   - Converts Blogger caption tables into standard WordPress `<figure>` and `<figcaption>` elements.

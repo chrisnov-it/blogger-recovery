@@ -303,9 +303,11 @@ class Blogger_Recovery_Plugin {
 				<label><input type="checkbox" id="opt-quotes" checked> <strong>Fix malformed HTML quotes</strong> <em>(width=""180?", align=""left"")</em></label>
 				<label><input type="checkbox" id="opt-adsense" checked> <strong>Remove AdSense blocks</strong> <em>(table-wrapped, div-wrapped, script tags)</em></label>
 				<label><input type="checkbox" id="opt-links" checked> <strong>Fix internal Blogger links</strong> <em>(/2017/03/slug.html → WordPress permalink)</em></label>
+				<label><input type="checkbox" id="opt-duplicate-titles" checked> <strong>Remove duplicate body titles</strong> <em>(hanya jika heading sama persis dengan judul WordPress)</em></label>
 
 				<hr class="br-divider">
 				<p class="br-section-label br-label--info">Standard Cleanup</p>
+				<label><input type="checkbox" id="opt-related" checked> Format <code>BACA JUGA</code> blocks dengan jarak vertikal</label>
 				<label><input type="checkbox" id="opt-captions" checked> Convert Blogger caption tables → <code>&lt;figure&gt;</code></label>
 				<label><input type="checkbox" id="opt-trbq" checked> Remove <code>tr_bq</code> blockquote class</label>
 				<label><input type="checkbox" id="opt-align" checked> Convert <code>align=center</code> → CSS</label>
@@ -338,12 +340,16 @@ class Blogger_Recovery_Plugin {
 					captions_converted: 0,
 					tables_cleaned: 0,
 					quotes_fixed: 0,
-					links_unresolved: 0
+					links_unresolved: 0,
+					related_formatted: 0,
+					titles_removed: 0
 				};
 				var opts = {
 					cleanup_malformed_quotes: $('#opt-quotes').is(':checked'),
 					cleanup_adsense:          $('#opt-adsense').is(':checked'),
 					cleanup_html_links:       $('#opt-links').is(':checked'),
+					cleanup_duplicate_titles: $('#opt-duplicate-titles').is(':checked'),
+					cleanup_related_links:    $('#opt-related').is(':checked'),
 					cleanup_caption_tables:   $('#opt-captions').is(':checked'),
 					cleanup_tr_bq:            $('#opt-trbq').is(':checked'),
 					cleanup_align:            $('#opt-align').is(':checked'),
@@ -371,6 +377,8 @@ class Blogger_Recovery_Plugin {
 							+ '• AdSense dihapus: '+s.adsense_removed+' artikel<br>'
 							+ '• HTML links fixed: '+s.html_links_fixed+' artikel<br>'
 							+ '• HTML links unresolved: '+s.links_unresolved+' link<br>'
+							+ '• Duplicate body titles removed: '+s.titles_removed+'<br>'
+							+ '• BACA JUGA blocks formatted: '+s.related_formatted+'<br>'
 							+ '• Caption tables: '+s.captions_converted+'<br>'
 							+ '• Tables cleaned: '+s.tables_cleaned+'<br>'
 							+ '• Quotes fixed: '+s.quotes_fixed+'<br>'

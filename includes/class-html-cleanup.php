@@ -8,8 +8,10 @@
  *   1. Fix malformed quotes  ← HARUS PERTAMA agar regex AdSense bisa match
  *   2. Remove AdSense blocks
  *   3. Fix internal Blogger links (/YYYY/MM/slug.html → WP permalink)
- *   4. Convert Blogger caption tables → <figure>
- *   5. Cleanup lainnya (tr_bq, align, border=0, table markup, fonts, empty elements)
+ *   4. Format manual "Baca Juga" blocks
+ *   5. Remove body heading duplicated from post_title
+ *   6. Convert Blogger caption tables → <figure>
+ *   7. Cleanup lainnya (tr_bq, align, border=0, table markup, fonts, empty elements)
  *
  * @package Blogger_Recovery
  * @since   2.0.0
@@ -35,6 +37,8 @@ class Blogger_HTML_Cleanup {
 		'tables_cleaned'     => 0,
 		'quotes_fixed'       => 0,
 		'links_unresolved'   => 0,
+		'related_formatted'   => 0,
+		'titles_removed'      => 0,
 	);
 
 	/** @var array|null Active non-regex Redirection rules, keyed by source path. */
@@ -80,6 +84,8 @@ class Blogger_HTML_Cleanup {
 			$content = $this->step_fix_malformed_quotes( $content, $options, $post, $logs );
 			$content = $this->step_remove_adsense( $content, $options, $post, $logs );
 			$content = $this->step_fix_html_links( $content, $options, $post, $logs );
+			$content = $this->step_format_related_links( $content, $options, $post, $logs );
+			$content = $this->step_remove_duplicate_title( $content, $options, $post, $logs );
 			$content = $this->step_convert_captions( $content, $options, $post, $logs );
 			$content = $this->step_misc_cleanup( $content, $options, $post, $logs );
 
@@ -313,7 +319,77 @@ class Blogger_HTML_Cleanup {
 	}
 
 	// =========================================================================
-	// STEP 4 — Convert Blogger caption table → <figure><figcaption>
+	// STEP 4 — Format manually authored "Baca Juga" blocks.
+	// =========================================================================
+
+	private function step_format_related_links( $content, $options, $post, &$logs ) {
+		if ( empty( $options['cleanup_related_links'] ) ) {
+			return $content;
+		}
+
+		$formatted = 0;
+		$content   = preg_replace_callback(
+			'/((?:<(?:i|em|b|strong|span)\b[^>]*>\s*)*baca\s+juga\s*:\s*(?:<\/(?:i|em|b|strong|span)>\s*)*(?:&nbsp;|\x{00a0}|\s)*(?:<b\b[^>]*>\s*)?<a\b[^>]*>[\s\S]*?<\/a>(?:\s*<\/b>)?)/iu',
+			function( $matches ) use ( &$formatted ) {
+				if ( false !== stripos( $matches[0], 'br-related-link' ) ) {
+					return $matches[0];
+				}
+
+				++$formatted;
+				return '<span class="br-related-link" style="display:block;margin:1.5em 0;">' . $matches[0] . '</span>';
+			},
+			$content
+		);
+
+		if ( $formatted ) {
+			$logs .= "Post #{$post->ID}: Formatted {$formatted} Baca Juga block(s).\n";
+			$this->stats['related_formatted'] += $formatted;
+		}
+
+		return $content;
+	}
+
+	// =========================================================================
+	// STEP 5 — Remove a Blogger body heading duplicated from post_title.
+	// =========================================================================
+
+	private function step_remove_duplicate_title( $content, $options, $post, &$logs ) {
+		if ( empty( $options['cleanup_duplicate_titles'] ) ) {
+			return $content;
+		}
+
+		$prefix = substr( $content, 0, 5000 );
+		if ( ! preg_match_all( '/<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1>/i', $prefix, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE ) ) {
+			return $content;
+		}
+
+		$post_title = $this->normalize_heading_text( $post->post_title );
+		foreach ( $matches as $heading ) {
+			if ( $this->normalize_heading_text( $heading[2][0] ) !== $post_title ) {
+				continue;
+			}
+
+			$content = substr_replace( $content, '', $heading[0][1], strlen( $heading[0][0] ) );
+			$logs   .= "Post #{$post->ID}: Removed duplicate body title ({$heading[1][0]}).\n";
+			++$this->stats['titles_removed'];
+			break;
+		}
+
+		return $content;
+	}
+
+	/**
+	 * Normalize heading and post title text for a conservative exact match.
+	 */
+	private function normalize_heading_text( $text ) {
+		$text = html_entity_decode( wp_strip_all_tags( $text ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		$text = remove_accents( strtolower( $text ) );
+
+		return trim( preg_replace( '/[^\p{L}\p{N}]+/u', ' ', $text ) );
+	}
+
+	// =========================================================================
+	// STEP 6 — Convert Blogger caption table → <figure><figcaption>
 	// =========================================================================
 
 	private function step_convert_captions( $content, $options, $post, &$logs ) {
@@ -323,7 +399,7 @@ class Blogger_HTML_Cleanup {
 
 		$before  = $content;
 		$content = preg_replace_callback(
-			'/<table[^>]*class=["\']tr-caption-container["\'][^>]*>[\s\S]*?<img([^>]*)>[\s\S]*?<td[^>]*class=["\']tr-caption["\'][^>]*>([\s\S]*?)<\/td>[\s\S]*?<\/table>/is',
+			'/<table\b[^>]*>(?:(?!<\/table>)[\s\S])*?<img([^>]*)>(?:(?!<\/table>)[\s\S])*?<td[^>]*class=["\'][^"\']*tr-caption[^"\']*["\'][^>]*>([\s\S]*?)<\/td>(?:(?!<\/table>)[\s\S])*?<\/table>/is',
 			function( $matches ) use ( &$logs, $post ) {
 				$img_attrs = $matches[1];
 				$caption   = trim( strip_tags( $matches[2] ) );
@@ -342,14 +418,31 @@ class Blogger_HTML_Cleanup {
 	}
 
 	// =========================================================================
-	// STEP 5 — Misc cleanup (urutan tidak kritis)
+	// STEP 7 — Misc cleanup (urutan tidak kritis)
 	// =========================================================================
 
 	private function step_misc_cleanup( $content, $options, $post, &$logs ) {
 		$before = $content;
 
 		if ( ! empty( $options['cleanup_tr_bq'] ) ) {
-			$content = preg_replace( '/<blockquote\s+class=["\']tr_bq["\']>/i', '<blockquote>', $content );
+			$content = preg_replace_callback(
+				'/<blockquote\b([^>]*)>/i',
+				function( $matches ) {
+					$attributes = preg_replace_callback(
+						'/\sclass=(["\'])(.*?)\1/i',
+						function( $class_match ) {
+							$classes = preg_split( '/\s+/', trim( $class_match[2] ) );
+							$classes = array_values( array_diff( $classes, array( 'tr_bq' ) ) );
+
+							return $classes ? ' class=' . $class_match[1] . implode( ' ', $classes ) . $class_match[1] : '';
+						},
+						$matches[1]
+					);
+
+					return '<blockquote' . $attributes . '>';
+				},
+				$content
+			);
 		}
 
 		if ( ! empty( $options['cleanup_align'] ) ) {
@@ -380,7 +473,10 @@ class Blogger_HTML_Cleanup {
 		if ( ! empty( $options['cleanup_empty_elements'] ) ) {
 			$content = preg_replace( '/<br\s*\/?>(\s*<br\s*\/?>)+/i', '<br>', $content );
 			$content = preg_replace( '/<p[^>]*>\s*(<br\s*\/?>)?\s*<\/p>/i', '', $content );
-			$content = preg_replace( '/<div[^>]*>\s*<\/div>/i', '', $content );
+			do {
+				$previous = $content;
+				$content  = preg_replace( '/<div[^>]*>\s*<\/div>/i', '', $content );
+			} while ( $content !== $previous );
 		}
 
 		if ( $content !== $before ) {
