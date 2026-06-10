@@ -109,7 +109,7 @@ class Blogger_HTML_Cleanup {
 	// =========================================================================
 	// STEP 1 — Fix malformed quotes
 	// HARUS dijalankan sebelum step_remove_adsense agar regex <td> bisa match.
-	// Contoh real ranalino.co: width=""180?" di dalam <td> AdSense Blogger.
+	// Contoh data migrasi: width=""180?" di dalam <td> AdSense Blogger.
 	// =========================================================================
 
 	private function step_fix_malformed_quotes( $content, $options, $post, &$logs ) {
@@ -131,7 +131,7 @@ class Blogger_HTML_Cleanup {
 
 	// =========================================================================
 	// STEP 2 — Remove AdSense blocks
-	// Pattern dari kondisi real ranalino.co: nested di dalam <table><tbody><tr><td>
+	// Pattern dari data migrasi Blogger: nested di dalam <table><tbody><tr><td>
 	// =========================================================================
 
 	private function step_remove_adsense( $content, $options, $post, &$logs ) {

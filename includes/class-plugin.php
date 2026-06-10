@@ -72,13 +72,16 @@ class Blogger_Recovery_Plugin {
 	public function page_main() {
 		?>
 		<div class="wrap br-wrap">
-			<h1>🚀 Blogger Recovery Tools <span class="br-version">v<?php echo esc_html( BLOGGER_RECOVERY_VERSION ); ?></span></h1>
-			<p>Solusi lengkap untuk recovery migrasi dari Blogger ke WordPress.</p>
+			<div class="br-hero">
+				<span class="br-eyebrow">Migration recovery toolkit</span>
+				<h1>Blogger Recovery Tools <span class="br-version">v<?php echo esc_html( BLOGGER_RECOVERY_VERSION ); ?></span></h1>
+				<p>Audit, preview, dan perbaiki sisa migrasi Blogger ke WordPress melalui workflow yang aman dan terukur.</p>
+			</div>
 
 			<div class="br-grid-2">
 				<div class="br-card">
-					<h2>📋 Workflow yang Direkomendasikan</h2>
-					<ol>
+					<h2>Workflow yang Direkomendasikan</h2>
+					<ol class="br-workflow">
 						<li><strong>Issues Detector</strong> — Scan & lihat scope masalah dulu</li>
 						<li><strong>Database Backup</strong> — Download snapshot SQL sebelum mode Apply</li>
 						<li><strong>Image Recovery</strong> — Strip Blogger href wrapper + download gambar yang belum ada</li>
@@ -86,23 +89,21 @@ class Blogger_Recovery_Plugin {
 						<li><strong>Redirect Migrator</strong> — Pindahkan rules dari plugin Redirection → Yoast Premium</li>
 					</ol>
 				</div>
-				<div class="br-card br-card--warn">
-					<h2>⚠️ Kondisi Real ranalino.co</h2>
-					<ul>
-						<li>🔗 <strong>~85 artikel</strong> — gambar dengan Blogger href wrapper</li>
-						<li>📜 <strong>~70 artikel</strong> — script AdSense tertanam</li>
-						<li>🔗 <strong>~224 artikel</strong> — internal link format <code>.html</code></li>
-						<li>🔀 <strong>54 redirect rules</strong> — siap dimigrasikan ke Yoast</li>
+				<div class="br-card br-card--soft">
+					<h2>Compatibility Note</h2>
+					<ul class="br-note-list">
+						<li>Plugin dibangun untuk pola migrasi Blogger yang spesifik, bukan semua kemungkinan struktur HTML.</li>
+						<li>Fitur telah diuji pada website <strong>ranalino.co</strong> dengan dataset migrasi nyata.</li>
+						<li>Website lain dapat memiliki markup, permalink, atau plugin redirect yang berbeda.</li>
+						<li>Selalu mulai dari <strong>Issues Detector</strong> dan <strong>Dry-run</strong>.</li>
 					</ul>
 				</div>
 			</div>
 
-			<div class="br-notice br-notice--success" style="margin-top:20px;">
-				<strong>v2.2:</strong>
-				Urutan cleanup diperbaiki (malformed quotes → AdSense),
-				logic Image Recovery disesuaikan kondisi real (strip href wrapper),
-				internal links memakai fallback Redirection, operasi tulis dilindungi dry-run,
-				dan database dapat dibackup langsung sebelum Apply.
+			<div class="br-notice br-notice--success">
+				<strong>Safe by default.</strong>
+				Dry-run aktif secara default, internal links dapat memakai fallback Redirection,
+				dan database dapat dibackup sebelum operasi Apply.
 			</div>
 			<div class="br-notice br-notice--warn" style="margin-top:20px;">
 				<strong>PERINGATAN OPERASI DESTRUKTIF:</strong>
@@ -134,8 +135,11 @@ class Blogger_Recovery_Plugin {
 		$nonce = wp_create_nonce( 'detect_issues' );
 		?>
 		<div class="wrap br-wrap">
-			<h1>🔍 Issues Detector</h1>
-			<p>Scan semua artikel untuk menemukan masalah migrasi dari Blogger.</p>
+			<div class="br-hero">
+				<span class="br-eyebrow">Read-only audit</span>
+				<h1>Issues Detector</h1>
+				<p>Scan artikel terbit untuk memetakan masalah migrasi sebelum perubahan apa pun dilakukan.</p>
+			</div>
 
 			<div class="br-actions">
 				<button class="button button-primary" id="btn-start-scan">▶ Scan All Posts</button>
@@ -210,7 +214,11 @@ class Blogger_Recovery_Plugin {
 		$nonce = wp_create_nonce( 'blogger_recover' );
 		?>
 		<div class="wrap br-wrap">
-			<h1>🖼 Image Recovery</h1>
+			<div class="br-hero">
+				<span class="br-eyebrow">Media migration</span>
+				<h1>Image Recovery</h1>
+				<p>Bersihkan wrapper Blogger dan impor gambar remote ke Media Library secara bertahap.</p>
+			</div>
 
 			<div class="br-notice br-notice--info">
 				<strong>Dua mode recovery:</strong><br>
@@ -223,10 +231,10 @@ class Blogger_Recovery_Plugin {
 				<?php $this->render_database_backup_button( true ); ?>
 			</div>
 
-			<label><input type="checkbox" id="recover-dry-run" checked> <strong>Dry-run (direkomendasikan)</strong></label>
-			<p>
+			<div class="br-action-panel">
+				<label class="br-toggle"><input type="checkbox" id="recover-dry-run" checked> Dry-run <span class="br-badge">Recommended</span></label>
 				<button class="button button-primary" id="btn-recover">▶ Run Image Recovery</button>
-			</p>
+			</div>
 			<div id="recover-progress" class="br-progress"></div>
 			<div id="recover-log" class="br-log"></div>
 		</div>
@@ -270,12 +278,16 @@ class Blogger_Recovery_Plugin {
 		$nonce = wp_create_nonce( 'cleanup_html' );
 		?>
 		<div class="wrap br-wrap">
-			<h1>🧹 HTML Cleanup</h1>
+			<div class="br-hero">
+				<span class="br-eyebrow">Content normalization</span>
+				<h1>HTML Cleanup</h1>
+				<p>Preview dan rapikan markup Blogger lama, embedded ads, serta internal links yang tidak lagi sesuai.</p>
+			</div>
 
 			<div class="br-notice br-notice--warn">
 				<strong>PERINGATAN OPERASI DESTRUKTIF:</strong>
 				Mode Apply menulis ulang <code>post_content</code> ratusan artikel. Backup database wajib tersedia.
-				<strong>Urutan kritis v2.0:</strong>
+				<strong>Urutan pemrosesan penting:</strong>
 				Malformed quotes (<code>width=""180?"</code>) diperbaiki <em>sebelum</em> AdSense removal —
 				ini yang menyebabkan AdSense tidak terhapus di versi sebelumnya.
 				<?php $this->render_database_backup_button( true ); ?>
@@ -286,14 +298,14 @@ class Blogger_Recovery_Plugin {
 				Link yang tidak dapat dipastikan targetnya akan dibiarkan dan dicatat sebagai unresolved.
 			</div>
 
-			<div class="br-card" style="margin-bottom:20px;">
-				<p class="br-section-label br-label--high">🔥 High Priority</p>
+			<div class="br-card">
+				<p class="br-section-label br-label--high">High Priority</p>
 				<label><input type="checkbox" id="opt-quotes" checked> <strong>Fix malformed HTML quotes</strong> <em>(width=""180?", align=""left"")</em></label>
 				<label><input type="checkbox" id="opt-adsense" checked> <strong>Remove AdSense blocks</strong> <em>(table-wrapped, div-wrapped, script tags)</em></label>
 				<label><input type="checkbox" id="opt-links" checked> <strong>Fix internal Blogger links</strong> <em>(/2017/03/slug.html → WordPress permalink)</em></label>
 
 				<hr class="br-divider">
-				<p class="br-section-label br-label--info">🔧 Standard Cleanup</p>
+				<p class="br-section-label br-label--info">Standard Cleanup</p>
 				<label><input type="checkbox" id="opt-captions" checked> Convert Blogger caption tables → <code>&lt;figure&gt;</code></label>
 				<label><input type="checkbox" id="opt-trbq" checked> Remove <code>tr_bq</code> blockquote class</label>
 				<label><input type="checkbox" id="opt-align" checked> Convert <code>align=center</code> → CSS</label>
@@ -303,8 +315,10 @@ class Blogger_Recovery_Plugin {
 				<label><input type="checkbox" id="opt-empty" checked> Clean empty elements & extra breaks</label>
 			</div>
 
-			<label><input type="checkbox" id="cleanup-dry-run" checked> <strong>Dry-run (direkomendasikan)</strong></label>
-			<p><button class="button button-primary" id="btn-cleanup">▶ Run HTML Cleanup</button></p>
+			<div class="br-action-panel">
+				<label class="br-toggle"><input type="checkbox" id="cleanup-dry-run" checked> Dry-run <span class="br-badge">Recommended</span></label>
+				<button class="button button-primary" id="btn-cleanup">▶ Run HTML Cleanup</button>
+			</div>
 			<div id="cleanup-progress" class="br-progress"></div>
 			<div id="cleanup-log" class="br-log"></div>
 		</div>
@@ -380,8 +394,11 @@ class Blogger_Recovery_Plugin {
 		$yoast_active = is_plugin_active( 'wordpress-seo-premium/wp-seo-premium.php' );
 		?>
 		<div class="wrap br-wrap">
-			<h1>🔀 Redirect Migrator</h1>
-			<p>Export rules dari plugin <strong>Redirection</strong> dan import ke <strong>Yoast SEO Premium</strong>.</p>
+			<div class="br-hero">
+				<span class="br-eyebrow">Redirect management</span>
+				<h1>Redirect Migrator</h1>
+				<p>Audit, export, dan migrasikan rules dari plugin Redirection ke Yoast SEO Premium.</p>
+			</div>
 			<div class="br-notice br-notice--warn">
 				<strong>PERINGATAN:</strong> Mode Apply menulis konfigurasi redirect Yoast Premium.
 				Jalankan dry-run dan export CSV terlebih dahulu. Jangan menonaktifkan Redirection sebelum hasil redirect diuji.
@@ -394,14 +411,14 @@ class Blogger_Recovery_Plugin {
 			</div>
 			<?php endif; ?>
 
-			<div class="br-actions">
+			<div class="br-action-panel">
+				<label class="br-toggle"><input type="checkbox" id="redirect-dry-run" checked> Dry-run <span class="br-badge">Recommended</span></label>
 				<button class="button button-primary" id="btn-load">📂 Load Rules dari Redirection</button>
 				<button class="button" id="btn-csv" disabled>⬇ Export CSV</button>
 				<button class="button button-primary" id="btn-yoast" disabled <?php echo $yoast_active ? '' : 'title="Yoast Premium tidak aktif"'; ?>>
 					▶ Run Yoast Migration
 				</button>
 			</div>
-			<label><input type="checkbox" id="redirect-dry-run" checked> <strong>Dry-run (direkomendasikan)</strong></label>
 
 			<div id="redirect-status" class="br-progress"></div>
 			<div id="redirect-table"></div>

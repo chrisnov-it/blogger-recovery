@@ -1,8 +1,8 @@
 # Blogger Recovery Tools
 
-A WordPress recovery plugin built specifically around the Blogger migration issues found on ranalino.co.
+A WordPress recovery toolkit for auditing and cleaning up common issues after migrating content from Blogger to WordPress.
 
-Current plugin version: **2.2.0**
+Current plugin version: **2.3.0**
 
 ## 🚀 Features
 
@@ -41,6 +41,12 @@ Current plugin version: **2.2.0**
 - **AJAX Driven**: Batch processing ensures the plugin can handle thousands of posts without timing out.
 - **Deterministic Batches**: Published posts are processed in ascending post ID order.
 - **WordPress APIs**: Uses native attachment, post update, nonce, capability, and Yoast redirect APIs.
+
+## ⚠️ Compatibility Notice
+
+This plugin handles a specific set of Blogger migration patterns and should not be assumed to support every migration scenario.
+
+It has been tested against a real migration dataset on **ranalino.co**. Other websites may use different Blogger markup, permalink structures, media URLs, database configurations, or redirect plugins. Always create a backup and review the dry-run output before applying changes.
 
 ## 👨‍💻 Author
 

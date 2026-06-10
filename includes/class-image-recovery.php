@@ -2,7 +2,7 @@
 /**
  * Image Recovery
  *
- * Menangani dua kondisi gambar Blogger di ranalino.co:
+ * Menangani dua kondisi umum gambar setelah migrasi Blogger:
  *
  * Kondisi A (utama): <a href="blogspot..."><img src="lokal..."></a>
  *   → Strip wrapper <a>, gambar lokal tampil clean tanpa redirect.
