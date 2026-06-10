@@ -25,6 +25,7 @@ class Blogger_Recovery_Plugin {
 		new Blogger_Image_Detector();
 		new Blogger_Image_Recovery();
 		new Blogger_HTML_Cleanup();
+		new Blogger_Paragraph_Normalizer();
 		new Blogger_Redirect_Migrator();
 		new Blogger_Database_Backup();
 	}
@@ -40,6 +41,7 @@ class Blogger_Recovery_Plugin {
 		add_submenu_page( $parent, 'Issues Detector',    '  ├─ Issues Detector',  $cap, 'blogger-issues-detector',    array( $this, 'page_detector' ) );
 		add_submenu_page( $parent, 'Image Recovery',     '  ├─ Image Recovery',   $cap, 'blogger-image-recovery',     array( $this, 'page_image_recovery' ) );
 		add_submenu_page( $parent, 'HTML Cleanup',       '  ├─ HTML Cleanup',     $cap, 'blogger-html-cleanup',       array( $this, 'page_cleanup' ) );
+		add_submenu_page( $parent, 'Paragraph Normalizer','  ├─ Paragraph Normalizer',$cap, 'blogger-paragraph-normalizer', array( $this, 'page_paragraph_normalizer' ) );
 		add_submenu_page( $parent, 'Redirect Migrator',  '  └─ Redirect Migrator',$cap, 'blogger-redirect-migrator',  array( $this, 'page_redirect' ) );
 	}
 
@@ -51,6 +53,7 @@ class Blogger_Recovery_Plugin {
 			&& strpos( $hook, 'blogger-issues' ) === false
 			&& strpos( $hook, 'blogger-image' ) === false
 			&& strpos( $hook, 'blogger-html' ) === false
+			&& strpos( $hook, 'blogger-paragraph' ) === false
 			&& strpos( $hook, 'blogger-redirect' ) === false
 		) {
 			return;
@@ -86,6 +89,7 @@ class Blogger_Recovery_Plugin {
 						<li><strong>Database Backup</strong> — Download snapshot SQL sebelum mode Apply</li>
 						<li><strong>Image Recovery</strong> — Strip Blogger href wrapper + download gambar yang belum ada</li>
 						<li><strong>HTML Cleanup</strong> — Hapus AdSense, fix internal links, bersihkan HTML lama</li>
+						<li><strong>Paragraph Normalizer</strong> — Preview dan rapikan paragraf berbasis div per artikel</li>
 						<li><strong>Redirect Migrator</strong> — Pindahkan rules dari plugin Redirection → Yoast Premium</li>
 					</ol>
 				</div>
@@ -107,7 +111,7 @@ class Blogger_Recovery_Plugin {
 			</div>
 			<div class="br-notice br-notice--warn" style="margin-top:20px;">
 				<strong>PERINGATAN OPERASI DESTRUKTIF:</strong>
-				Image Recovery, HTML Cleanup, dan Redirect Migrator dapat mengubah konten, membuat attachment,
+				Image Recovery, HTML Cleanup, Paragraph Normalizer, dan Redirect Migrator dapat mengubah konten, membuat attachment,
 				atau menulis konfigurasi redirect dalam jumlah besar. Jalankan <strong>Dry-run</strong> terlebih dahulu,
 				periksa log, dan pastikan backup database serta folder uploads tersedia sebelum memakai mode Apply.
 			</div>
@@ -394,7 +398,199 @@ class Blogger_Recovery_Plugin {
 	}
 
 	// =========================================================================
-	// HALAMAN 5 — Redirect Migrator
+	// HALAMAN 5 — Paragraph Normalizer
+	// =========================================================================
+
+	public function page_paragraph_normalizer() {
+		$nonce = wp_create_nonce( 'normalize_paragraphs' );
+		?>
+		<div class="wrap br-wrap">
+			<div class="br-hero">
+				<span class="br-eyebrow">Selective content restructuring</span>
+				<h1>Paragraph Normalizer</h1>
+				<p>Ubah pola paragraf berbasis <code>&lt;div&gt;</code> dari Blogger menjadi markup semantik secara selektif.</p>
+			</div>
+
+			<div class="br-notice br-notice--warn">
+				<strong>PERINGATAN OPERASI DESTRUKTIF:</strong>
+				Apply menulis ulang struktur HTML artikel terpilih. Mulai dari satu artikel, periksa preview dan frontend,
+				lalu lanjutkan dalam batch kecil. Maksimal 20 artikel per eksekusi.
+				<?php $this->render_database_backup_button( true ); ?>
+			</div>
+			<div class="br-notice br-notice--info">
+				<strong>Pengaman:</strong> Artikel Gutenberg dilewati. Plugin hanya mengubah <code>&lt;div&gt;</code> tanpa class/ID
+				dengan alignment <code>left</code>/<code>justify</code>, mempertahankan teks, link, gambar, dan embed,
+				serta menolak hasil yang gagal validasi.
+			</div>
+
+			<div class="br-card">
+				<div class="br-actions">
+					<button class="button button-primary" id="btn-paragraph-scan">Scan Candidate Posts</button>
+					<button class="button" id="btn-select-safe" disabled>Select First 10 Safe</button>
+					<button class="button" id="btn-clear-selection" disabled>Clear Selection</button>
+				</div>
+				<label class="br-field">
+					<span><strong>Post IDs manual</strong> <small>pisahkan dengan koma, maksimal 20</small></span>
+					<input type="text" id="paragraph-post-ids" placeholder="785, 751, 703">
+				</label>
+				<div id="paragraph-scan-status" class="br-progress"></div>
+				<div id="paragraph-candidates" class="br-results"></div>
+			</div>
+
+			<div class="br-action-panel">
+				<label class="br-toggle"><input type="checkbox" id="paragraph-dry-run" checked> Dry-run <span class="br-badge">Recommended</span></label>
+				<button class="button button-primary" id="btn-normalize-selected">Run Selected Posts</button>
+			</div>
+			<div id="paragraph-run-status" class="br-progress"></div>
+			<div id="paragraph-log" class="br-log"></div>
+
+			<div id="paragraph-preview" class="br-preview" hidden>
+				<div class="br-preview__header">
+					<div>
+						<span class="br-eyebrow">Read-only preview</span>
+						<h2 id="paragraph-preview-title">Preview</h2>
+					</div>
+					<button class="button" id="btn-close-preview">Close Preview</button>
+				</div>
+				<div id="paragraph-preview-status" class="br-notice br-notice--info"></div>
+				<div class="br-preview__grid">
+					<label><strong>Before</strong><textarea id="paragraph-before" readonly></textarea></label>
+					<label><strong>After</strong><textarea id="paragraph-after" readonly></textarea></label>
+				</div>
+			</div>
+		</div>
+
+		<script>
+		jQuery(function($){
+			var nonce = '<?php echo esc_js( $nonce ); ?>';
+			var rows = [];
+
+			function escapeHtml(value) {
+				return $('<div>').text(value == null ? '' : value).html();
+			}
+
+			function selectedIds() {
+				var ids = [];
+				$('.br-paragraph-select:checked').each(function(){ ids.push(parseInt($(this).val(), 10)); });
+				$.each($('#paragraph-post-ids').val().split(','), function(i, value){
+					var id = parseInt($.trim(value), 10);
+					if (id > 0) ids.push(id);
+				});
+				return ids.filter(function(id, index){ return ids.indexOf(id) === index; });
+			}
+
+			$('#btn-paragraph-scan').on('click', function(){
+				$(this).prop('disabled', true);
+				$('#paragraph-scan-status').text('Scanning published posts…');
+				$('#paragraph-candidates').html('');
+				$.post(ajaxurl, { action:'blogger_scan_paragraphs', _wpnonce:nonce }, function(r){
+					$('#btn-paragraph-scan').prop('disabled', false);
+					if (!r.success) {
+						$('#paragraph-scan-status').html('<span class="br-error">'+escapeHtml(r.data)+'</span>');
+						return;
+					}
+					rows = r.data.rows;
+					$('#paragraph-scan-status').html('Ditemukan <strong>'+rows.length+'</strong> artikel kandidat.');
+					$('#btn-select-safe, #btn-clear-selection').prop('disabled', rows.length === 0);
+					renderRows();
+				}, 'json');
+			});
+
+			function renderRows() {
+				var html = '<div class="br-table-scroll"><table class="widefat striped"><thead><tr>'
+					+'<th></th><th>ID</th><th>Artikel</th><th>Div</th><th>Paragraf</th><th>Spacer</th><th>Ambigu</th><th>Status</th><th>Action</th>'
+					+'</tr></thead><tbody>';
+				$.each(rows, function(i, row){
+					var safe = row.eligible && (row.paragraphs + row.spacers > 0);
+					html += '<tr>'
+						+'<td><input class="br-paragraph-select" type="checkbox" value="'+row.id+'" '+(safe ? '' : 'disabled')+'></td>'
+						+'<td><code>#'+row.id+'</code></td>'
+						+'<td><strong>'+escapeHtml(row.title)+'</strong></td>'
+						+'<td>'+row.divs+'</td><td>'+row.paragraphs+'</td><td>'+row.spacers+'</td><td>'+row.ambiguous+'</td>'
+						+'<td>'+(safe ? '<span class="br-status br-status--safe">Safe candidate</span>' : '<span class="br-status br-status--review">Review</span>')+'</td>'
+						+'<td><button class="button br-preview-button" data-id="'+row.id+'">Preview</button> '
+						+'<a class="button" href="'+escapeHtml(row.view_url)+'" target="_blank" rel="noopener">View</a></td>'
+						+'</tr>';
+				});
+				html += '</tbody></table></div>';
+				$('#paragraph-candidates').html(html);
+			}
+
+			$('#btn-select-safe').on('click', function(){
+				$('.br-paragraph-select').prop('checked', false);
+				$('.br-paragraph-select:not(:disabled)').slice(0, 10).prop('checked', true);
+			});
+			$('#btn-clear-selection').on('click', function(){
+				$('.br-paragraph-select').prop('checked', false);
+				$('#paragraph-post-ids').val('');
+			});
+
+			$(document).on('click', '.br-preview-button', function(){
+				var id = $(this).data('id');
+				$('#paragraph-preview').prop('hidden', false);
+				$('#paragraph-preview-title').text('Loading Post #'+id+'…');
+				$('#paragraph-preview-status').text('Generating preview…');
+				$('#paragraph-before, #paragraph-after').val('');
+				$('html, body').animate({ scrollTop: $('#paragraph-preview').offset().top - 40 }, 200);
+				$.post(ajaxurl, { action:'blogger_preview_paragraphs', post_id:id, _wpnonce:nonce }, function(r){
+					if (!r.success) {
+						$('#paragraph-preview-status').removeClass('br-notice--info').addClass('br-notice--warn').text(r.data);
+						return;
+					}
+					var d = r.data;
+					$('#paragraph-preview-title').text('#'+d.id+' — '+d.title);
+					$('#paragraph-before').val(d.before);
+					$('#paragraph-after').val(d.after);
+					$('#paragraph-preview-status').removeClass('br-notice--warn').addClass(d.safe ? 'br-notice--info' : 'br-notice--warn')
+						.html(d.safe
+							? '<strong>Valid preview.</strong> '+d.stats.paragraphs+' paragraf, '+d.stats.spacers+' spacer, '+d.stats.wrappers+' wrapper akan dirapikan.'
+							: '<strong>Skipped:</strong> '+escapeHtml(d.reason));
+				}, 'json');
+			});
+			$('#btn-close-preview').on('click', function(){ $('#paragraph-preview').prop('hidden', true); });
+
+			$('#btn-normalize-selected').on('click', function(){
+				var ids = selectedIds();
+				if (!ids.length) { alert('Pilih artikel atau masukkan Post ID.'); return; }
+				if (ids.length > 20) { alert('Maksimal 20 artikel per eksekusi.'); return; }
+
+				var dryRun = $('#paragraph-dry-run').is(':checked');
+				var confirmation = dryRun ? '' : prompt('Apply akan menulis ulang struktur HTML '+ids.length+' artikel. Ketik NORMALIZE untuk melanjutkan:');
+				if (!dryRun && confirmation !== 'NORMALIZE') return;
+
+				$(this).prop('disabled', true);
+				$('#paragraph-log').html('');
+				$('#paragraph-run-status').text(dryRun ? 'Running selected dry-run…' : 'Applying selected normalization…');
+				$.post(ajaxurl, {
+					action:'blogger_normalize_paragraphs',
+					post_ids:ids,
+					dry_run:dryRun,
+					apply_confirm:confirmation,
+					_wpnonce:nonce
+				}, function(r){
+					$('#btn-normalize-selected').prop('disabled', false);
+					if (!r.success) {
+						$('#paragraph-run-status').html('<span class="br-error">'+escapeHtml(r.data)+'</span>');
+						return;
+					}
+					var d = r.data, s = d.summary;
+					$('#paragraph-run-status').html('<strong>'+(d.dry_run ? 'Dry-run selesai.' : 'Apply selesai.')+'</strong> '
+						+s.changed+' berubah, '+s.unchanged+' tanpa perubahan, '+s.skipped+' dilewati.');
+					var log = '';
+					$.each(d.logs, function(i, line){ log += escapeHtml(line)+'<br>'; });
+					log += '<div class="br-notice br-notice--success"><strong>Summary</strong><br>'
+						+'• Posts selected: '+s.selected+'<br>• Paragraphs normalized: '+s.paragraphs
+						+'<br>• Spacers removed: '+s.spacers+'<br>• Wrappers removed: '+s.wrappers+'</div>';
+					$('#paragraph-log').html(log);
+				}, 'json');
+			});
+		});
+		</script>
+		<?php
+	}
+
+	// =========================================================================
+	// HALAMAN 6 — Redirect Migrator
 	// =========================================================================
 
 	public function page_redirect() {

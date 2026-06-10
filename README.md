@@ -2,7 +2,7 @@
 
 A WordPress recovery toolkit for auditing and cleaning up common issues after migrating content from Blogger to WordPress.
 
-Current plugin version: **2.4.0**
+Current plugin version: **2.5.0**
 
 ## 🚀 Features
 
@@ -18,6 +18,7 @@ Current plugin version: **2.4.0**
   - Modernizes table structures.
   - Converts Blogger caption tables into standard WordPress `<figure>` and `<figcaption>` elements.
 - **Redirect Migrator**: Exports active Redirection rules to CSV and imports them through the Yoast SEO Premium redirect API.
+- **Paragraph Normalizer**: Scans legacy div-based paragraphs, previews one post at a time, and normalizes selected Post IDs in guarded batches of up to 20.
 - **Dry-run by Default**: Image recovery, HTML cleanup, and redirect migration preview their work without writing files or database changes.
 - **Explicit Apply Guard**: Write operations require disabling dry-run and typing `APPLY`.
 - **Full Database Backup**: Generates a temporary full SQL dump, downloads it as `.sql.gz`, and removes the server-side temporary file immediately.
@@ -36,7 +37,8 @@ Current plugin version: **2.4.0**
 4. Run each recovery module in **Dry-run** mode and review its log.
 5. Run **Image Recovery** in Apply mode only after verifying the image report.
 6. Run **HTML Cleanup** in Apply mode; manually authored links such as `BACA JUGA` are resolved from their `href` using current post slugs and active Redirection rules.
-7. Review unresolved `.html` links, export redirect CSV, then migrate valid Redirection rules to Yoast Premium.
+7. Use **Paragraph Normalizer** on selected legacy posts, starting with one Post ID and reviewing the frontend after Apply.
+8. Review unresolved `.html` links, export redirect CSV, then migrate valid Redirection rules to Yoast Premium.
 
 ## 📝 Technical Details
 

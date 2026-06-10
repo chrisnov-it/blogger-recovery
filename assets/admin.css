@@ -317,6 +317,86 @@
 	margin-top: 22px;
 }
 
+.br-field {
+	display: flex;
+	align-items: flex-start;
+	flex-direction: column;
+	gap: 7px;
+	margin: 4px 0 14px;
+}
+
+.br-field input[type="text"] {
+	width: min(100%, 520px);
+}
+
+.br-table-scroll {
+	overflow-x: auto;
+}
+
+.br-status {
+	display: inline-flex;
+	padding: 4px 8px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.br-status--safe {
+	background: #edf7ef;
+	color: #006b1b;
+}
+
+.br-status--review {
+	background: #fff4e5;
+	color: #8a4b00;
+}
+
+.br-preview {
+	margin-top: 20px;
+	padding: 22px;
+	border: 1px solid var(--br-border);
+	border-radius: 12px;
+	background: var(--br-surface);
+	box-shadow: 0 8px 30px rgba(0, 0, 0, .08);
+}
+
+.br-preview__header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	margin-bottom: 16px;
+}
+
+.br-preview__header h2 {
+	margin: 0;
+}
+
+.br-preview__grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+}
+
+.br-preview__grid label {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.br-preview__grid textarea {
+	width: 100%;
+	min-height: 420px;
+	padding: 12px;
+	border-color: var(--br-border);
+	border-radius: 8px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+	font-size: 11px;
+	line-height: 1.55;
+	white-space: pre;
+}
+
 .br-wrap .widefat {
 	overflow: hidden;
 	border-color: var(--br-border);
@@ -346,6 +426,10 @@
 
 @media (max-width: 782px) {
 	.br-grid-2 {
+		grid-template-columns: 1fr;
+	}
+
+	.br-preview__grid {
 		grid-template-columns: 1fr;
 	}
 
