@@ -2,7 +2,7 @@
 
 A WordPress recovery plugin built specifically around the Blogger migration issues found on ranalino.co.
 
-Current plugin version: **2.1.0**
+Current plugin version: **2.2.0**
 
 ## 🚀 Features
 
@@ -18,6 +18,7 @@ Current plugin version: **2.1.0**
 - **Redirect Migrator**: Exports active Redirection rules to CSV and imports them through the Yoast SEO Premium redirect API.
 - **Dry-run by Default**: Image recovery, HTML cleanup, and redirect migration preview their work without writing files or database changes.
 - **Explicit Apply Guard**: Write operations require disabling dry-run and typing `APPLY`.
+- **Full Database Backup**: Generates a temporary full SQL dump, downloads it as `.sql.gz`, and removes the server-side temporary file immediately.
 
 ## 🛠️ Installation
 
@@ -29,10 +30,11 @@ Current plugin version: **2.1.0**
 
 1. **Backup your database** before running any automated cleanup.
 2. Run the **Issues Detector** to see the extent of migration issues.
-3. Run each recovery module in **Dry-run** mode and review its log.
-4. Run **Image Recovery** in Apply mode only after verifying the image report.
-5. Run **HTML Cleanup** in Apply mode; manually authored links such as `BACA JUGA` are resolved from their `href` using current post slugs and active Redirection rules.
-6. Review unresolved `.html` links, export redirect CSV, then migrate valid Redirection rules to Yoast Premium.
+3. Download a **Full Database Backup** and store it securely; it contains sensitive user and configuration data.
+4. Run each recovery module in **Dry-run** mode and review its log.
+5. Run **Image Recovery** in Apply mode only after verifying the image report.
+6. Run **HTML Cleanup** in Apply mode; manually authored links such as `BACA JUGA` are resolved from their `href` using current post slugs and active Redirection rules.
+7. Review unresolved `.html` links, export redirect CSV, then migrate valid Redirection rules to Yoast Premium.
 
 ## 📝 Technical Details
 

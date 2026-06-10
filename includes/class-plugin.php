@@ -26,6 +26,7 @@ class Blogger_Recovery_Plugin {
 		new Blogger_Image_Recovery();
 		new Blogger_HTML_Cleanup();
 		new Blogger_Redirect_Migrator();
+		new Blogger_Database_Backup();
 	}
 
 	/**
@@ -79,6 +80,7 @@ class Blogger_Recovery_Plugin {
 					<h2>📋 Workflow yang Direkomendasikan</h2>
 					<ol>
 						<li><strong>Issues Detector</strong> — Scan & lihat scope masalah dulu</li>
+						<li><strong>Database Backup</strong> — Download snapshot SQL sebelum mode Apply</li>
 						<li><strong>Image Recovery</strong> — Strip Blogger href wrapper + download gambar yang belum ada</li>
 						<li><strong>HTML Cleanup</strong> — Hapus AdSense, fix internal links, bersihkan HTML lama</li>
 						<li><strong>Redirect Migrator</strong> — Pindahkan rules dari plugin Redirection → Yoast Premium</li>
@@ -96,16 +98,29 @@ class Blogger_Recovery_Plugin {
 			</div>
 
 			<div class="br-notice br-notice--success" style="margin-top:20px;">
-				<strong>v2.1:</strong>
+				<strong>v2.2:</strong>
 				Urutan cleanup diperbaiki (malformed quotes → AdSense),
 				logic Image Recovery disesuaikan kondisi real (strip href wrapper),
-				internal links memakai fallback Redirection, dan operasi tulis dilindungi dry-run.
+				internal links memakai fallback Redirection, operasi tulis dilindungi dry-run,
+				dan database dapat dibackup langsung sebelum Apply.
 			</div>
 			<div class="br-notice br-notice--warn" style="margin-top:20px;">
 				<strong>PERINGATAN OPERASI DESTRUKTIF:</strong>
 				Image Recovery, HTML Cleanup, dan Redirect Migrator dapat mengubah konten, membuat attachment,
 				atau menulis konfigurasi redirect dalam jumlah besar. Jalankan <strong>Dry-run</strong> terlebih dahulu,
 				periksa log, dan pastikan backup database serta folder uploads tersedia sebelum memakai mode Apply.
+			</div>
+			<div class="br-card br-backup-card">
+				<h2>Database Backup</h2>
+				<p>
+					Download dump penuh database sebagai <code>.sql.gz</code>. Backup mencakup users, password hash,
+					options, post content, dan data plugin sehingga file ini <strong>sangat sensitif</strong>.
+				</p>
+				<p>
+					File dibuat di direktori temporary server, langsung dikirim ke browser, lalu dihapus.
+					Plugin tidak menyimpan salinan backup di web root atau Media Library.
+				</p>
+				<?php $this->render_database_backup_button(); ?>
 			</div>
 		</div>
 		<?php
@@ -205,6 +220,7 @@ class Blogger_Recovery_Plugin {
 			<div class="br-notice br-notice--warn">
 				<strong>PERINGATAN:</strong> Mode Apply akan mengubah HTML artikel dan dapat membuat file serta attachment baru.
 				Dry-run hanya membuat laporan dan tidak mengunduh gambar atau menulis database.
+				<?php $this->render_database_backup_button( true ); ?>
 			</div>
 
 			<label><input type="checkbox" id="recover-dry-run" checked> <strong>Dry-run (direkomendasikan)</strong></label>
@@ -262,6 +278,7 @@ class Blogger_Recovery_Plugin {
 				<strong>Urutan kritis v2.0:</strong>
 				Malformed quotes (<code>width=""180?"</code>) diperbaiki <em>sebelum</em> AdSense removal —
 				ini yang menyebabkan AdSense tidak terhapus di versi sebelumnya.
+				<?php $this->render_database_backup_button( true ); ?>
 			</div>
 			<div class="br-notice br-notice--info">
 				<strong>Internal links:</strong> Semua anchor termasuk blok manual seperti <code>BACA JUGA</code> diperiksa berdasarkan
@@ -368,6 +385,7 @@ class Blogger_Recovery_Plugin {
 			<div class="br-notice br-notice--warn">
 				<strong>PERINGATAN:</strong> Mode Apply menulis konfigurasi redirect Yoast Premium.
 				Jalankan dry-run dan export CSV terlebih dahulu. Jangan menonaktifkan Redirection sebelum hasil redirect diuji.
+				<?php $this->render_database_backup_button( true ); ?>
 			</div>
 
 			<?php if ( ! $yoast_active ) : ?>
@@ -456,6 +474,27 @@ class Blogger_Recovery_Plugin {
 			});
 		});
 		</script>
+		<?php
+	}
+
+	/**
+	 * Render the authenticated database backup download form.
+	 *
+	 * @param bool $compact Whether to use compact spacing inside a warning.
+	 */
+	private function render_database_backup_button( $compact = false ) {
+		?>
+		<form
+			method="post"
+			action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
+			class="<?php echo $compact ? 'br-backup-form br-backup-form--compact' : 'br-backup-form'; ?>"
+		>
+			<input type="hidden" name="action" value="blogger_recovery_database_backup">
+			<?php wp_nonce_field( 'blogger_recovery_database_backup' ); ?>
+			<button type="submit" class="button button-primary">
+				Download Full Database Backup
+			</button>
+		</form>
 		<?php
 	}
 }

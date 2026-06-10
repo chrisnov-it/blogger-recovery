@@ -31,6 +31,13 @@
 	background: #fff8e1;
 	border-color: #ffe082;
 }
+.br-backup-card {
+	margin-top: 20px;
+	border-color: #b71c1c;
+	background: #fff5f5;
+}
+.br-backup-form { margin: 12px 0 0; }
+.br-backup-form--compact { display: inline-block; margin-left: 10px; }
 
 /* Section labels inside card */
 .br-section-label {
