@@ -1,17 +1,27 @@
 # Blogger Recovery Tools
 
-A comprehensive WordPress plugin designed to fix common issues after migrating from Blogger (Blogspot) to WordPress.
+A WordPress recovery toolkit for auditing and cleaning up common issues after migrating content from Blogger to WordPress.
+
+Current plugin version: **2.5.0**
 
 ## 🚀 Features
 
-- **Issues Detector**: Scans all posts to find broken local images, remaining Blogger image URLs, and legacy HTML patterns (like `tr_bq` classes or deprecated align attributes).
-- **Image Recovery**: Automatically detects broken image references, finds the original Blogger source, downloads the images, imports them to your WordPress Media Library, and updates post content.
+- **Issues Detector**: Scans published posts for Blogger image wrappers, remote Blogger image sources, embedded AdSense, legacy `.html` links, and old Blogger markup.
+- **Image Recovery**: Removes obsolete Blogger link wrappers and imports images whose `src` still points to Blogger.
 - **HTML Cleanup**: Modernizes old Blogger HTML markup:
   - Removes AdSense blocks (Tables, Scripts, and Ads).
   - Fixes malformed HTML quotes (e.g., `align=""left""`).
+  - Resolves Blogger `.html` links to matching WordPress post slugs.
+  - Removes an early body heading only when it exactly matches the WordPress post title.
+  - Adds consistent vertical spacing to manually authored `BACA JUGA` link blocks.
   - Converts deprecated `align` attributes to modern CSS classes.
   - Modernizes table structures.
   - Converts Blogger caption tables into standard WordPress `<figure>` and `<figcaption>` elements.
+- **Redirect Migrator**: Exports active Redirection rules to CSV and imports them through the Yoast SEO Premium redirect API.
+- **Paragraph Normalizer**: Scans legacy div-based paragraphs, previews one post at a time, and normalizes selected Post IDs in guarded batches of up to 20.
+- **Dry-run by Default**: Image recovery, HTML cleanup, and redirect migration preview their work without writing files or database changes.
+- **Explicit Apply Guard**: Write operations require disabling dry-run and typing `APPLY`.
+- **Full Database Backup**: Generates a temporary full SQL dump, downloads it as `.sql.gz`, and removes the server-side temporary file immediately.
 
 ## 🛠️ Installation
 
@@ -23,14 +33,24 @@ A comprehensive WordPress plugin designed to fix common issues after migrating f
 
 1. **Backup your database** before running any automated cleanup.
 2. Run the **Issues Detector** to see the extent of migration issues.
-3. Run **Image Recovery** to bring all images over to your server.
-4. Run **HTML Cleanup** to ensure your posts look modern and clean.
+3. Download a **Full Database Backup** and store it securely; it contains sensitive user and configuration data.
+4. Run each recovery module in **Dry-run** mode and review its log.
+5. Run **Image Recovery** in Apply mode only after verifying the image report.
+6. Run **HTML Cleanup** in Apply mode; manually authored links such as `BACA JUGA` are resolved from their `href` using current post slugs and active Redirection rules.
+7. Use **Paragraph Normalizer** on selected legacy posts, starting with one Post ID and reviewing the frontend after Apply.
+8. Review unresolved `.html` links, export redirect CSV, then migrate valid Redirection rules to Yoast Premium.
 
 ## 📝 Technical Details
 
-- **WPCS Compliant**: 100% adherence to WordPress Coding Standards.
 - **AJAX Driven**: Batch processing ensures the plugin can handle thousands of posts without timing out.
-- **Safe Processing**: Uses WordPress native functions like `wp_insert_attachment` and `wp_update_post`.
+- **Deterministic Batches**: Published posts are processed in ascending post ID order.
+- **WordPress APIs**: Uses native attachment, post update, nonce, capability, and Yoast redirect APIs.
+
+## ⚠️ Compatibility Notice
+
+This plugin handles a specific set of Blogger migration patterns and should not be assumed to support every migration scenario.
+
+It has been tested against a real migration dataset on **ranalino.co**. Other websites may use different Blogger markup, permalink structures, media URLs, database configurations, or redirect plugins. Always create a backup and review the dry-run output before applying changes.
 
 ## 👨‍💻 Author
 
